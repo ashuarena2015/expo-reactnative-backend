@@ -15,8 +15,8 @@ const __dirname = dirname(__filename);
 
 const { routerAccount } = require('./routes/accounts');
 
-const MONGO_URI_LOCAL = "mongodb://127.0.0.1:27017/signups-testing";
-// const MONGO_URI_CLOUD = "mongodb+srv://ashuarena:arenaashu@cluster0.teyrnb7.mongodb.net/my-academy?retryWrites=true&w=majority&appName=Cluster0";
+// const MONGO_URI_LOCAL = "mongodb://127.0.0.1:27017/signups-testing";
+const MONGO_URI_CLOUD = "mongodb+srv://ashuarena:arenaashu@cluster0.teyrnb7.mongodb.net/signups-testing?retryWrites=true&w=majority&appName=Cluster0";
 
 /*** FOR MIGRATION ONLY
  * 
@@ -84,7 +84,7 @@ const MONGO_URI_LOCAL = "mongodb://127.0.0.1:27017/signups-testing";
 //     console.error("❌ MongoDB Connection Error:", err);
 //   });
 
-mongoose.connect(MONGO_URI_LOCAL, {
+mongoose.connect(MONGO_URI_CLOUD, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 })
