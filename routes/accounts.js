@@ -83,9 +83,11 @@ routerAccount.post("/create", async (req, res) => {
     }
 });
 
-const generateUUID = () => {
-    return crypto.randomUUID(); // Available in modern browsers and Node.js
-}
+const generateSixDigitCode = () => {
+    const array = new Uint32Array(1);
+    crypto.getRandomValues(array);
+    return String(array[0] % 1000000).padStart(6, '0'); // ensures it's 6 digits
+  };
 
 routerAccount.post("/verify", async (req, res) => {
     try {
@@ -95,7 +97,7 @@ routerAccount.post("/verify", async (req, res) => {
             // Check If User Exists In The Database
             const user = await AccountCreation.findOne({ email, isVerified: false, verify_otp: otp });
             if(user) {
-                const defaultPassoword = generateUUID();
+                const defaultPassoword = generateSixDigitCode();
                 // 🔹 Hash the password with a salt
                 const saltRounds = 10;
                 const hashedPassword = await bcrypt.hash(defaultPassoword, saltRounds);
