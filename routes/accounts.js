@@ -28,11 +28,13 @@ const transporter = nodemailer.createTransport({
 
 routerAccount.get('/auth', verifyToken, async (req, res) => {
     try {
+        console.log('Auth login');
         const existingUser = await AccountCreation.findOne({ email: req.user?.email });
         return res
             .status(200)
             .json({
                 user: existingUser,
+                isAuthLogin: true
             });
     } catch (error) {
         return res
@@ -50,11 +52,33 @@ routerAccount.post("/create", async (req, res) => {
         }
         // Check If User Exists In The Database
         const user = await AccountCreation.findOne({ email });
+        const otp = Math.floor(100000 + Math.random() * 900000);
+        if(user) {
+            await AccountCreation.findOneAndUpdate(
+                {
+                    email,
+                },
+                {
+                    verify_otp: otp
+                }
+            );
+            await transporter.sendMail({
+                from: '"Admin portal application" <ashuarena@gmail.com>',
+                to: email,
+                subject: 'Admin-Portal-App: Email Verification Code',
+                text: `Your verification code is ${otp}`
+            });
+            return res.status(200).json({
+                message: "Please check your mail to get OTP.",
+                user: {
+                    email: user?.email
+                },
+                isLoginOtpSent: true
+            });
+        }
         if(!user) {
-            const otp = Math.floor(100000 + Math.random() * 900000);
             const newUser = new AccountCreation({
                 email,
-                isVerified: false,
                 verify_otp: otp
             });
             await newUser.save();
@@ -70,12 +94,9 @@ routerAccount.post("/create", async (req, res) => {
                 user: {
                     email: newUser?.email
                 },
-                isVerified: false
             });
         }
-        if (user && user?.isVerified) {
-            return res.status(201).json({ message: "User verified, please enter passowrd", isVerified: true, user });
-        } else {
+        else {
             return res.status(401).send({message: 'Please provide correct details.'});
         }
     } catch (error) {
@@ -92,75 +113,41 @@ const generateSixDigitCode = () => {
 routerAccount.post("/verify", async (req, res) => {
     try {
     
-        const { otp, email, password } = req.body;
+        const { otp, email } = req.body;
         if (otp) {
             // Check If User Exists In The Database
-            const user = await AccountCreation.findOne({ email, isVerified: false, verify_otp: otp });
+            const user = await AccountCreation.findOne({ email, verify_otp: otp });
             if(user) {
-                const defaultPassoword = generateSixDigitCode();
-                // 🔹 Hash the password with a salt
-                const saltRounds = 10;
-                const hashedPassword = await bcrypt.hash(defaultPassoword, saltRounds);
-                const newUser = await AccountCreation.findOneAndUpdate(
-                    {
-                        email,
-                        verify_otp: otp
-                    },
-                    {
-                        password: hashedPassword,
-                        isVerified: true
-                    }
-                );
-                console.log({newUser});
+                // Generate JWT Token
+                const token = jwt.sign({
+                    userId: user._id,
+                    email: user.email
+                },
+                "1234!@#%<{*&)",
+                {
+                    expiresIn: "24h",
+                });
+
+                res.cookie("auth", token, {
+                    httpOnly: true, // ✅ Prevents client-side access
+                    secure: true, // ✅ Use HTTPS in production
+                    sameSite: "Strict" // ✅ Prevents CSRF attacks
+                });
+
                 await transporter.sendMail({
                     from: '"Admin portal application" <ashuarena@gmail.com>',
                     to: email,
-                    subject: 'Admin-Portal-App: Your password',
-                    text: `Your default password is ${defaultPassoword}, please change your password on profile page.`
+                    subject: 'Admin-Portal-App: Your account has been verified successfully!',
+                    text: `You can now start browsing the app's pages. Happy Browsing!!!`
                 });
                 return res.status(200).json({
                     message: "Your account has been created.",
-                    user: newUser,
-                    isVerified: true
+                    user,
+                    token
                 });
-            }
-            if (user && user?.isVerified) {
-                return res.status(201).json({ message: "User verified, please enter passowrd", isVerifiedUser: true });
             } else {
-                console.log('user && !passwordMatch');
                 return res.status(401).send({message: 'Please provide correct details.'});
             }
-        } 
-        if (password) {
-            const user = await AccountCreation.findOne({ email, isVerified: true });
-            // Compare Passwords
-            const passwordMatch = await bcrypt.compare(password, user.password);
-            if(!user || !passwordMatch) {
-                return res.status(401).json({ message: "Invalid username or password" });
-            }
-
-            // Generate JWT Token
-            const token = jwt.sign({
-                userId: user._id,
-                email: user.email
-            },
-            "1234!@#%<{*&)",
-            {
-                expiresIn: "24h",
-            });
-
-            res.cookie("auth", token, {
-                httpOnly: true, // ✅ Prevents client-side access
-                secure: true, // ✅ Use HTTPS in production
-                sameSite: "Strict" // ✅ Prevents CSRF attacks
-            });
-
-            return res.status(200).json({
-                message: "Login Successful",
-                user,
-                token,
-                isVerified: true
-            });
         }
     } catch (error) {
         res.send({error: error?.errmsg});
