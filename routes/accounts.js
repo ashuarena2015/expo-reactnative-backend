@@ -55,50 +55,29 @@ routerAccount.post("/create", async (req, res) => {
         const otp = Math.floor(100000 + Math.random() * 900000);
         if(user) {
             await AccountCreation.findOneAndUpdate(
-                {
-                    email,
-                },
-                {
-                    verify_otp: otp
-                }
+                { email },
+                { verify_otp: otp }
             );
-            await transporter.sendMail({
-                from: '"Admin portal application" <ashuarena@gmail.com>',
-                to: email,
-                subject: 'Admin-Portal-App: Email Verification Code',
-                text: `Your verification code is ${otp}`
-            });
-            return res.status(200).json({
-                message: "Please check your mail to get OTP.",
-                user: {
-                    email: user?.email
-                },
-                isLoginOtpSent: true
-            });
-        }
-        if(!user) {
-            const newUser = new AccountCreation({
-                email,
-                verify_otp: otp
-            });
-            await newUser.save();
-
-            await transporter.sendMail({
-                from: '"Admin portal application" <ashuarena@gmail.com>',
-                to: email,
-                subject: 'Admin-Portal-App: Email Verification Code',
-                text: `Your verification code is ${otp}`
-            });
-            return res.status(200).json({
-                message: "Your account has been created.",
-                user: {
-                    email: newUser?.email
-                },
-            });
         }
         else {
-            return res.status(401).send({message: 'Please provide correct details.'});
+            await AccountCreation.insertOne({
+                email,
+                verify_otp: otp
+            })
         }
+        await transporter.sendMail({
+            from: '"Admin portal application" <ashuarena@gmail.com>',
+            to: email,
+            subject: 'Admin-Portal-App: Email Verification Code',
+            text: `Your verification code is ${otp}`
+        });
+        return res.status(200).json({
+            message: "Please check your mail to get OTP.",
+            user: {
+                email: user?.email
+            },
+            isLoginOtpSent: true
+        });
     } catch (error) {
         res.send({error: error?.errmsg});
     }
@@ -127,6 +106,11 @@ routerAccount.post("/verify", async (req, res) => {
                 {
                     expiresIn: "24h",
                 });
+
+                await AccountCreation.findOneAndUpdate(
+                    { email },
+                    { verify_otp: '', isVerified: true }
+                );
 
                 res.cookie("auth", token, {
                     httpOnly: true, // ✅ Prevents client-side access
